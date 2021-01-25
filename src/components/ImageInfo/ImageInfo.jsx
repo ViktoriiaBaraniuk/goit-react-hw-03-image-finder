@@ -20,35 +20,46 @@ class ImageInfo extends Component {
   componentDidUpdate(prevProps, prevState) {
     const prevName = prevProps.imageName;
     const nextName = this.props.imageName;
-    const nextPage = this.state.page;
-    const prevPage = prevState.page;
-
-    if (prevName !== nextName || prevPage !== nextPage) {
-      this.setState({ status: 'pending' });
-      imagesAPI
-        .fetchImages(nextName, nextPage)
-        .then(images => {
-          if (images.total !== 0) {
-            this.setState(prevState => ({
-              images: [...prevState.images, ...images.hits],
-              status: 'resolved',
-            }));
-          }
-        })
-        .catch(error => this.setState({ error, status: 'rejected' }));
+    const { page, images } = this.state;
+    if (prevName !== nextName) {
+      if (page === 1 && images.length === 0) {
+        this.fetchImages();
+      } else {
+        this.setState({ page: 1, images: [], status: 'pending' });
+        this.fetchImages();
+      }
     }
 
-    if (prevName !== nextName) {
-      this.setState({ page: 1, images: [] });
+    if (prevState.page !== page) {
+      this.fetchImages();
+    }
+    if (prevState.images !== images) {
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: 'smooth',
+      });
     }
   }
 
+  fetchImages = () => {
+    imagesAPI
+      .fetchImages(this.props.imageName, this.state.page)
+      .then(images => {
+        if (images.hits.length !== 0) {
+          this.setState(prevState => ({
+            images: [...prevState.images, ...images.hits],
+            status: 'resolved',
+          }));
+        }
+      })
+
+      .catch(error => this.setState({ error, status: 'rejected' }));
+  };
   onClickLoadMore = () => {
     this.setState(prevState => ({
       page: prevState.page + 1,
     }));
   };
-
   render() {
     const { images, status } = this.state;
 
@@ -56,10 +67,6 @@ class ImageInfo extends Component {
       return (
         <div className="IdleMessage">Please enter data to search field</div>
       );
-    }
-
-    if (status === 'pending') {
-      return <Loader />;
     }
     if (status === 'rejected') {
       return <ImageError />;
@@ -72,14 +79,16 @@ class ImageInfo extends Component {
       );
     }
 
-    if (status === 'resolved') {
-      return (
-        <>
-          <ImageGallery images={images} />
-          <Button onClick={this.onClickLoadMore} page={this.state.page} />
-        </>
-      );
-    }
+    return (
+      <>
+        <ImageGallery images={images} />
+        {status === 'pending' ? (
+          <Loader />
+        ) : (
+          <Button onClick={this.onClickLoadMore} />
+        )}
+      </>
+    );
   }
 }
 
